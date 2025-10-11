@@ -19,6 +19,7 @@
       --radius-sm: 12px;
       --gap: 20px;
       --maxw: 1200px;
+      --ratio: 3 / 4; /* более высокое окно предпросмотра */
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -39,7 +40,7 @@
     }
 
     a { color: inherit; }
-    img, video { display: block; width: 100%; height: 100%; object-fit: cover; }
+    img, video { display: block; width: 100%; height: 100%; object-fit: contain; }
 
     /* ===== ШАПКА ===== */
     header {
@@ -69,8 +70,8 @@
     .panel h3 { margin: 0; font-size: 16px; color: var(--accent-start); letter-spacing: 0.2px; }
 
     /* Единое соотношение сторон для опрятности карточек */
-    .media { position: relative; border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow); background: #000; }
-    .media::before { content: ""; display: block; aspect-ratio: 4 / 3; }
+    .media { position: relative; border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow); background: #000; cursor: zoom-in; }
+    .media::before { content: ""; display: block; aspect-ratio: var(--ratio); }
     .media > * { position: absolute; inset: 0; }
 
     /* Подписи / метаданные */
@@ -100,7 +101,13 @@
       .item { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
       .media::before { aspect-ratio: auto; }
     }
-  </style>
+    /* Лайтбокс */
+    dialog#lightbox::backdrop { background: rgba(0,0,0,.6); }
+    dialog#lightbox { border: none; padding: 0; background: transparent; }
+    .lightbox-inner { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center; }
+    .lightbox-content { width: min(95vw, 1600px); height: min(95vh, 900px); }
+    .lightbox-content img, .lightbox-content video { width: 100%; height: 100%; object-fit: contain; }
+</style>
 </head>
 <body>
   <header>
@@ -134,10 +141,7 @@
             
           </figure>
         </div>
-        <div class="item-actions">
-          <button class="btn" data-action="pause">Пауза</button>
-          <button class="btn" data-action="mute">Без звука</button>
-        </div>
+        
       </article>
 
       <!-- ПАРА 2 -->
@@ -162,10 +166,7 @@
             
           </figure>
         </div>
-        <div class="item-actions">
-          <button class="btn" data-action="pause">Пауза</button>
-          <button class="btn" data-action="mute">Без звука</button>
-        </div>
+        
       </article>
 
       <!-- ПАРА 3 -->
@@ -190,10 +191,7 @@
             
           </figure>
         </div>
-        <div class="item-actions">
-          <button class="btn" data-action="pause">Пауза</button>
-          <button class="btn" data-action="mute">Без звука</button>
-        </div>
+        
       </article>
 
       <!-- Добавляй новые пары по образцу -->
@@ -219,16 +217,59 @@
     }, { rootMargin: '200px 0px' });
     lazyVideos.forEach(v => io.observe(v));
 
-    // ===== УТИЛИТЫ КНОПОК НА КАРТОЧКЕ =====
+    
+    // ===== ЛАЙТБОКС (клик по превью открывает во весь экран) =====
+    const lightbox = document.getElementById('lightbox');
+    const lightboxContent = document.getElementById('lightboxContent');
+
+    function openLightboxWithMedia(node){
+      lightboxContent.innerHTML = '';
+      let el;
+      if (node.tagName.toLowerCase() === 'img') {
+        el = document.createElement('img');
+        el.src = node.currentSrc || node.src;
+        el.alt = node.alt || 'Изображение';
+      } else if (node.tagName.toLowerCase() === 'video') {
+        el = document.createElement('video');
+        el.controls = true;
+        el.autoplay = true;
+        el.playsInline = true;
+        const source = node.querySelector('source');
+        const src = (source && (source.dataset.src || source.src)) || node.currentSrc || node.src;
+        if (src) el.src = src;
+        if (node.poster) el.poster = node.poster;
+      }
+      if (!el) return;
+      lightboxContent.appendChild(el);
+      lightbox.showModal();
+    }
+
     document.addEventListener('click', e => {
-      const btn = e.target.closest('[data-action]');
-      if (!btn) return;
-      const item = btn.closest('.item');
-      const videos = item.querySelectorAll('video');
-      const action = btn.dataset.action;
-      if (action === 'pause') videos.forEach(v => v.pause());
-      if (action === 'mute') videos.forEach(v => v.muted = true);
+      const media = e.target.closest('.media img, .media video');
+      if (media) {
+        openLightboxWithMedia(media);
+      }
+      if (e.target.closest('[data-close]') && e.target === e.target.closest('[data-close]')) {
+        lightbox.close();
+      }
     });
+
+    // Закрытие по ESC
+    window.addEventListener('keydown', e => { if (e.key === 'Escape' && lightbox.open) lightbox.close(); });
+
+    // Даблклик внутри — вход в системный fullscreen
+    lightbox.addEventListener('dblclick', () => {
+      const host = lightbox.querySelector('.lightbox-inner');
+      if (!document.fullscreenElement && host.requestFullscreen) host.requestFullscreen();
+      else if (document.exitFullscreen) document.exitFullscreen();
+    });
+
   </script>
+  <dialog id="lightbox" aria-label="Просмотр в полный экран">
+    <div class="lightbox-inner" data-close>
+      <div class="lightbox-content" id="lightboxContent"></div>
+    </div>
+  </dialog>
+
 </body>
 </html>
