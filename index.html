@@ -107,6 +107,15 @@
     .lightbox-inner { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center; }
     .lightbox-content { width: min(95vw, 1600px); height: min(95vh, 900px); }
     .lightbox-content img, .lightbox-content video { width: 100%; height: 100%; object-fit: contain; }
+  /* Оверлей */
+    .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 9999; }
+    .overlay.visible { display: flex; }
+    .overlay-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.9); }
+    .overlay-box { position: relative; width: min(95vw, 1600px); height: min(95vh, 900px); display: grid; grid-template-rows: 1fr auto; gap: 12px; }
+    .overlay-content { width: 100%; height: 100%; }
+    .overlay-content img, .overlay-content video { width: 100%; height: 100%; object-fit: contain; background: #000; border-radius: var(--radius-sm); box-shadow: var(--shadow); }
+    .overlay-actions { display: flex; justify-content: center; }
+    .overlay-close { position: absolute; top: -8px; right: -8px; width: 36px; height: 36px; border-radius: 999px; border: none; background: linear-gradient(135deg, var(--accent-start), var(--accent-end)); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; box-shadow: var(--shadow); }
 </style>
 </head>
 <body>
@@ -124,22 +133,13 @@
         <div class="item-inner">
           <figure class="panel">
             <h3>До</h3>
-            <div class="media">
-              <img loading="lazy" decoding="async" src="photos/before1.jpg" alt="Оригинальное фото №1 до обработки">
-            </div>
-            
-          </figure>
+            <div class="media">$1</div>
+            <button class="btn zoom-btn" type="button" aria-label="Увеличить">Увеличить</button></figure>
 
           <figure class="panel">
             <h3>После</h3>
-            <div class="media">
-              <video class="lazy-video" preload="metadata" controls playsinline poster="photos/before1.jpg" aria-label="Видео №1 после обработки">
-                <source data-src="videos/after1.mp4" type="video/mp4">
-                Ваш браузер не поддерживает видео.
-              </video>
-            </div>
-            
-          </figure>
+            <div class="media">$1</div>
+            <button class="btn zoom-btn" type="button" aria-label="Увеличить">Увеличить</button></figure>
         </div>
         
       </article>
@@ -149,22 +149,13 @@
         <div class="item-inner">
           <figure class="panel">
             <h3>До</h3>
-            <div class="media">
-              <img loading="lazy" decoding="async" src="photos/before2.jpg" alt="Оригинальное фото №2 до обработки">
-            </div>
-            
-          </figure>
+            <div class="media">$1</div>
+            <button class="btn zoom-btn" type="button" aria-label="Увеличить">Увеличить</button></figure>
 
           <figure class="panel">
             <h3>После</h3>
-            <div class="media">
-              <video class="lazy-video" preload="metadata" controls playsinline poster="photos/before2.jpg" aria-label="Видео №2 после обработки">
-                <source data-src="videos/after2.mp4" type="video/mp4">
-                Ваш браузер не поддерживает видео.
-              </video>
-            </div>
-            
-          </figure>
+            <div class="media">$1</div>
+            <button class="btn zoom-btn" type="button" aria-label="Увеличить">Увеличить</button></figure>
         </div>
         
       </article>
@@ -174,22 +165,13 @@
         <div class="item-inner">
           <figure class="panel">
             <h3>До</h3>
-            <div class="media">
-              <img loading="lazy" decoding="async" src="photos/before3.jpg" alt="Оригинальное фото №3 до обработки">
-            </div>
-            
-          </figure>
+            <div class="media">$1</div>
+            <button class="btn zoom-btn" type="button" aria-label="Увеличить">Увеличить</button></figure>
 
           <figure class="panel">
             <h3>После</h3>
-            <div class="media">
-              <video class="lazy-video" preload="metadata" controls playsinline poster="photos/before3.jpg" aria-label="Видео №3 после обработки">
-                <source data-src="videos/after3.mp4" type="video/mp4">
-                Ваш браузер не поддерживает видео.
-              </video>
-            </div>
-            
-          </figure>
+            <div class="media">$1</div>
+            <button class="btn zoom-btn" type="button" aria-label="Увеличить">Увеличить</button></figure>
         </div>
         
       </article>
@@ -198,6 +180,17 @@
 
     </section>
   </main>
+
+  <div id="overlay" class="overlay" aria-hidden="true">
+    <div class="overlay-backdrop" data-close></div>
+    <div class="overlay-box">
+      <button class="overlay-close" type="button" aria-label="Закрыть" data-close>&times;</button>
+      <div class="overlay-content" id="overlayContent"></div>
+      <div class="overlay-actions">
+        <button class="btn overlay-fullscreen" type="button" id="overlayFs">Во весь экран</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     // ===== ЛЕНИВАЯ ЗАГРУЗКА ВИДЕО =====
@@ -217,13 +210,13 @@
     }, { rootMargin: '200px 0px' });
     lazyVideos.forEach(v => io.observe(v));
 
-    
-    // ===== ЛАЙТБОКС (клик по превью открывает во весь экран) =====
-    const lightbox = document.getElementById('lightbox');
-    const lightboxContent = document.getElementById('lightboxContent');
+    // ===== ЛАЙТБОКС-ОВЕРЛЕЙ БЕЗ <dialog> =====
+    const overlay = document.getElementById('overlay');
+    const overlayContent = document.getElementById('overlayContent');
+    const overlayFsBtn = document.getElementById('overlayFs');
 
-    function openLightboxWithMedia(node){
-      lightboxContent.innerHTML = '';
+    function openOverlayFrom(node){
+      overlayContent.innerHTML = '';
       let el;
       if (node.tagName.toLowerCase() === 'img') {
         el = document.createElement('img');
@@ -240,30 +233,39 @@
         if (node.poster) el.poster = node.poster;
       }
       if (!el) return;
-      lightboxContent.appendChild(el);
-      lightbox.showModal();
+      overlayContent.appendChild(el);
+      overlay.classList.add('visible');
+      overlay.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeOverlay(){
+      overlay.classList.remove('visible');
+      overlay.setAttribute('aria-hidden', 'true');
+      overlayContent.innerHTML = '';
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
     }
 
     document.addEventListener('click', e => {
-      const media = e.target.closest('.media img, .media video');
-      if (media) {
-        openLightboxWithMedia(media);
+      // Кнопка Увеличить
+      const zoomBtn = e.target.closest('.zoom-btn');
+      if (zoomBtn) {
+        const panel = zoomBtn.closest('.panel');
+        const media = panel && panel.querySelector('.media img, .media video');
+        if (media) openOverlayFrom(media);
+        return;
       }
-      if (e.target.closest('[data-close]') && e.target === e.target.closest('[data-close]')) {
-        lightbox.close();
+      // Закрытие
+      if (e.target.closest('[data-close]')) {
+        closeOverlay();
       }
     });
 
-    // Закрытие по ESC
-    window.addEventListener('keydown', e => { if (e.key === 'Escape' && lightbox.open) lightbox.close(); });
-
-    // Даблклик внутри — вход в системный fullscreen
-    lightbox.addEventListener('dblclick', () => {
-      const host = lightbox.querySelector('.lightbox-inner');
+    // Fullscreen для коробки оверлея (работает и на iOS для видео)
+    overlayFsBtn.addEventListener('click', () => {
+      const host = overlay.querySelector('.overlay-box');
       if (!document.fullscreenElement && host.requestFullscreen) host.requestFullscreen();
       else if (document.exitFullscreen) document.exitFullscreen();
     });
-
   </script>
   <dialog id="lightbox" aria-label="Просмотр в полный экран">
     <div class="lightbox-inner" data-close>
